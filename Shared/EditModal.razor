@@ -1,0 +1,585 @@
+﻿@using AzureNamingTool.Helpers
+@using AzureNamingTool.Models
+@using AzureNamingTool.Services
+@using Microsoft.AspNetCore.Html
+@inject IJSRuntime JsRuntime
+@inject IToastService toastService
+@inject ILogger<EditModal> Logger
+@inject StateContainer state
+
+<div class="modal fade show d-block" tabindex="-1" role="dialog">
+    <div class="modal-backdrop fade show" @onclick="Cancel"></div>
+    <div class="modal-dialog" style="z-index: 1050">
+        <!-- Pop it above the backdrop -->
+        <div class="modal-content @theme.ThemeStyle">
+            <div class="modal-header bg-navcolor text-white">
+                <h3 class="modal-title">@title</h3>
+            </div>
+            <div class="modal-body">
+                <p>
+                    @((MarkupString)message)
+                </p>
+                <div id="globallyoptionalcontainer" class="card mb-3">
+                    <div class="card-header bg-default text-black fw-bold">
+                        Name
+                    </div>
+                    <div class="card card-body @theme.ThemeStyle">
+                        @if (protectedName)
+                        {
+                            @if (type == "ResourceComponent")
+                            {
+                                <input title="Name" value="@itemDisplayName" disabled type="text" class="form-control @theme.ThemeStyle" id="name" @onchange="@((ui) => { itemName = (string)ui.Value;})" />
+                            }
+                            else
+                            {
+                                <input title="Name" value="@itemName" disabled type="text" class="form-control @theme.ThemeStyle" id="name" @onchange="@((ui) => { itemName = (string)ui.Value;})" />
+                            }
+                        }
+                        else
+                        {
+                            <input title="Name" value="@itemName" type="text" class="form-control @theme.ThemeStyle" id="name" @onchange="@((ui) => { itemName = (string)ui.Value;})" />
+                        }
+                    </div>
+                </div>
+                @if (type == "ResourceComponent")
+                {
+                    <div id="globallyoptionalcontainer" class="card mb-3">
+                        <div class="card-header bg-default text-black fw-bold">
+                            <a id="OptionalComponents" class="link-dark text-decoration-none" data-toggle="collapse" href="#globallyoptional" role="button" aria-expanded="false" aria-controls="globallyoptional">
+                                <span class="oi oi-chevron-bottom" aria-hidden="true"></span> Globally Optional Configuration
+                            </a>
+                        </div>
+                        <div class="collapse card card-body @theme.ThemeStyle" id="globallyoptional">
+                            <div class="mb-3">
+                                This section allows you to add/remove the component as OPTIONAL for all resource types.
+                            </div>
+                            <table class="table @theme.ThemeStyle">
+                                <tbody>
+                                    <tr>
+                                        <td>
+                                            This option will ADD the component as OPTIONAL for all resource types.
+                                        </td>
+                                        <td>
+                                            <button type="button" class="btn btn-success w-100" @onclick="@(e => FormAction("ResourceComponent","optional-add"))" style="min-width:42px;" title="Add as OPTIONAL for all resoure types">
+                                                ADD
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            This option will REMOVE the component from OPTIONAL for all resource types.
+                                        </td>
+                                        <td>
+                                            <button type="button" class="btn btn-danger w-100" @onclick="@(e => FormAction("ResourceComponent","optional-remove"))" style="min-width:42px;" title="Remove as OPTIONAL for all resoure types">
+                                                REMOVE
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div id="globallyexcludecontainer" class="card mb-3">
+                        <div class="card-header bg-default text-black fw-bold">
+                            <a id="OptionalComponents" class="link-dark text-decoration-none" data-toggle="collapse" href="#globallyexclude" role="button" aria-expanded="false" aria-controls="globallyexclude">
+                                <span class="oi oi-chevron-bottom" aria-hidden="true"></span> Globally Exclude Configuration
+                            </a>
+                        </div>
+                        <div class="collapse card card-body @theme.ThemeStyle" id="globallyexclude">
+                            <div class="mb-3">
+                                This section allows you to add/remove the component as EXCLUDE for all resource types.
+                            </div>
+                            <table class="table">
+                                <tbody>
+                                    <tr>
+                                        <td>
+                                            This option will ADD the component as EXCLUDE for all resource types.
+                                        </td>
+                                        <td>
+                                            <button type="button" class="btn btn-success w-100" @onclick="@(e => FormAction("ResourceComponent","exclude-add"))" style="min-width:42px;" title="Add as EXCLUDE for all resoure types">
+                                                ADD
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            This option will REMOVE the component from EXCLUDE for all resource types.
+                                        </td>
+                                        <td>
+                                            <button type="button" class="btn btn-danger w-100" @onclick="@(e => FormAction("ResourceComponent","exclude-remove"))" style="min-width:42px;" title="Remove as EXCLUDE for all resoure types">
+                                                REMOVE
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div id="globallyoptionalcontainer" class="card mb-3">
+                        <div class="card-header bg-default text-black fw-bold">
+                            Short Name
+                        </div>
+                        <div class="card card-body @theme.ThemeStyle">
+                            <input title="Short Name" value="@itemShortName" type="text" class="form-control @theme.ThemeStyle" id="shortname" @onchange="@((ui) => { itemShortName = (string)ui.Value;})" />
+                        </div>
+                    </div>
+                }
+                @if ((type == "ResourceType") && (resourceComponents != null))
+                {
+                    @if (bool.Parse(ConfigurationHelper.GetAppSetting("DevMode")))
+                    {
+                        <div id="globallyoptionalcontainer" class="card mb-3">
+                            <div class="card-header bg-default text-black fw-bold">
+                                Regex
+                            </div>
+                            <div class="card card-body @theme.ThemeStyle">
+                                <input title="RegEx" value="@itemRegEx" type="text" class="form-control @theme.ThemeStyle" id="shortname" @onchange="@((ui) => { itemRegEx = (string)ui.Value;})" />
+                            </div>
+                        </div>
+                    }
+                    <div id="optional" class="card mb-3">
+                        <div class="card-header bg-default text-black fw-bold">
+                            <a id="OptionalComponents" class="link-dark text-decoration-none" data-toggle="collapse" href="#optionalcomponents" role="button" aria-expanded="false" aria-controls="optionalcomponents">
+                                <span class="oi oi-chevron-bottom" aria-hidden="true"></span> Optional Components
+                            </a>
+                        </div>
+                        <div class="collapse card card-body @theme.ThemeStyle" id="optionalcomponents">
+                            @foreach (ResourceComponent resourceComponent in resourceComponents)
+                            {
+                                if (resourceComponent.Name != "ResourceType")
+                                {
+                                    <div class="form-check">
+                                        @if (optional.ToLower().Contains(GeneralHelper.NormalizeName(resourceComponent.Name, true)))
+                                        {
+                                            <input title="Optional Component" class="form-check-input" type="checkbox" value="" id="optional-@GeneralHelper.NormalizeName(resourceComponent.Name, true)" checked>
+                                            <label class="form-check-label" for="optional-@GeneralHelper.NormalizeName(resourceComponent.Name, true)">
+                                                @resourceComponent.DisplayName
+                                            </label>
+                                        }
+                                        else
+                                        {
+                                            <input title="Optional Component" class="form-check-input" type="checkbox" value="" id="optional-@GeneralHelper.NormalizeName(resourceComponent.Name, true)">
+                                            <label class="form-check-label" for="optional-@GeneralHelper.NormalizeName(resourceComponent.Name, true)">
+                                                @resourceComponent.DisplayName
+                                            </label>
+                                        }
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+
+                    <div id="excluded" class="card mb-3">
+                        <div class="card-header bg-default text-black fw-bold">
+                            <a id="ExcludedComponents" class="link-dark text-decoration-none" data-toggle="collapse" href="#excludedcomponents" role="button" aria-expanded="false" aria-controls="excludedcomponents">
+                                <span class="oi oi-chevron-bottom" aria-hidden="true"></span> Excluded Components
+                            </a>
+                        </div>
+                        <div class="collapse card card-body @theme.ThemeStyle" id="excludedcomponents">
+                            @foreach (ResourceComponent resourceComponent in resourceComponents)
+                            {
+                                //@if (resourceComponent.Name != "ResourceType")
+                                //{
+                                <div class="form-check">
+                                    @if (exclude.ToLower().Contains(GeneralHelper.NormalizeName(resourceComponent.Name, true)))
+                                    {
+                                        <input title="Excluded Component" class="form-check-input" type="checkbox" id="exclude-@GeneralHelper.NormalizeName(resourceComponent.Name, true)" checked>
+                                        <label class="form-check-label" for="exclude-@GeneralHelper.NormalizeName(resourceComponent.Name, true)">
+                                            @resourceComponent.DisplayName
+                                        </label>
+                                    }
+                                    else
+                                    {
+                                        <input title="Excluded Component" class="form-check-input" type="checkbox" id="exclude-@GeneralHelper.NormalizeName(resourceComponent.Name, true)">
+                                        <label class="form-check-label" for="exclude-@GeneralHelper.NormalizeName(resourceComponent.Name, true)">
+                                            @resourceComponent.DisplayName
+                                        </label>
+                                    }
+                                </div>
+                                //}
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="modal-footer">
+                @if (type != "ResourceComponent")
+                {
+                    <button title="Save" @onclick="Save" class="btn btn-success">Update</button>
+                }
+                <button title="Cancel" @onclick="Cancel" class="btn btn-secondary">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+@code {
+
+    [CascadingParameter] BlazoredModalInstance ModalInstance { get; set; }
+    [Parameter] public ThemeInfo theme { get; set; }
+    [CascadingParameter]
+    public IModalService Modal { get; set; }
+
+    [Parameter] public int id { get; set; }
+    [Parameter] public string title { get; set; }
+    [Parameter] public string message { get; set; }
+    [Parameter] public string type { get; set; }
+    [Parameter] public bool protectedName { get; set; }
+
+
+    private ServiceResponse serviceResponse = new();
+    private string? itemName;
+    private string? itemDisplayName;
+    private string? itemShortName;
+    private string? itemRegEx;
+    private List<ResourceComponent> resourceComponents;
+    private string? optional;
+    private string? exclude;
+    private bool ischecked = false;
+    private ResponseMessage responseMessage = new();
+
+    protected override async void OnInitialized()
+    {
+        switch (type)
+        {
+            case "ResourceComponent":
+                serviceResponse = await ResourceComponentService.GetItem(id);
+                ResourceComponent resourceComponent = (ResourceComponent)serviceResponse.ResponseObject;
+                itemName = resourceComponent.Name;
+                itemDisplayName = resourceComponent.DisplayName;
+                break;
+            case "ResourceEnvironment":
+                serviceResponse = await ResourceEnvironmentService.GetItem(id);
+                ResourceEnvironment resourceEnvironment = (ResourceEnvironment)serviceResponse.ResponseObject;
+                itemName = resourceEnvironment.Name;
+                itemShortName = resourceEnvironment.ShortName;
+                break;
+            case "ResourceLocation":
+                serviceResponse = await ResourceLocationService.GetItem(id);
+                ResourceLocation resourceLocation = (ResourceLocation)serviceResponse.ResponseObject;
+                itemName = resourceLocation.Name;
+                itemShortName = resourceLocation.ShortName;
+                break;
+            case "ResourceOrg":
+                serviceResponse = await ResourceOrgService.GetItem(id);
+                ResourceOrg resourceOrg = (ResourceOrg)serviceResponse.ResponseObject;
+                itemName = resourceOrg.Name;
+                itemShortName = resourceOrg.ShortName;
+                break;
+            case "ResourceProjAppSvc":
+                serviceResponse = await ResourceProjAppSvcService.GetItem(id);
+                ResourceProjAppSvc resourceProjAppSvc = (ResourceProjAppSvc)serviceResponse.ResponseObject;
+                itemName = resourceProjAppSvc.Name;
+                itemShortName = resourceProjAppSvc.ShortName;
+                break;
+            case "ResourceType":
+                serviceResponse = await ResourceTypeService.GetItem(id);
+                ResourceType resourceType = (ResourceType)serviceResponse.ResponseObject;
+                itemName = resourceType.Resource;
+                itemShortName = resourceType.ShortName;
+                optional = resourceType.Optional;
+                exclude = resourceType.Exclude;
+                itemRegEx = resourceType.Regx;
+                serviceResponse = await ResourceComponentService.GetItems(true);
+                resourceComponents = (List<ResourceComponent>)serviceResponse.ResponseObject;
+                resourceComponents = resourceComponents.OrderBy(x => x.Name).ToList();
+                break;
+            case "ResourceUnitDept":
+                serviceResponse = await ResourceUnitDeptService.GetItem(id);
+                ResourceUnitDept resourceUnitDept = (ResourceUnitDept)serviceResponse.ResponseObject;
+                itemName = resourceUnitDept.Name;
+                itemShortName = resourceUnitDept.ShortName;
+                break;
+            case "ResourceFunction":
+                serviceResponse = await ResourceFunctionService.GetItem(id);
+                ResourceFunction resourceFunction = (ResourceFunction)serviceResponse.ResponseObject;
+                itemName = resourceFunction.Name;
+                itemShortName = resourceFunction.ShortName;
+                break;
+            case "CustomComponent":
+                serviceResponse = await CustomComponentService.GetItem(id);
+                CustomComponent customComponent = (CustomComponent)serviceResponse.ResponseObject;
+                itemName = customComponent.Name;
+                itemShortName = customComponent.ShortName;
+                break;
+        }
+    }
+
+    async void Save()
+    {
+        try
+        {
+            bool valid = false;
+            if (type == "ResourceComponent")
+            {
+                if (itemName != null)
+                {
+                    if (itemName != "")
+                    {
+                        valid = true;
+                        serviceResponse = await ResourceComponentService.GetItem(id);
+                        ResourceComponent resourceComponent = (ResourceComponent)serviceResponse.ResponseObject;
+
+                        // Update any references in the custom components configuration to be the new custom component type name
+                        serviceResponse = await CustomComponentService.GetItemsByParentType(GeneralHelper.NormalizeName(resourceComponent.Name, true));
+                        var customcomponents = (List<CustomComponent>)serviceResponse.ResponseObject;
+                        foreach (var customcomponent in customcomponents)
+                        {
+                            customcomponent.ParentComponent = GeneralHelper.NormalizeName(itemName, true);
+                            serviceResponse = await CustomComponentService.PostItem(customcomponent);
+                        }
+
+                        resourceComponent.Name = itemName;
+                        resourceComponent.DisplayName = itemName;
+                        serviceResponse = await ResourceComponentService.PostItem(resourceComponent);
+                    }
+                    else
+                    {
+                        toastService.ShowError("You must enter a name!", "ERROR");
+                    }
+                }
+                else
+                {
+                    toastService.ShowError("You must enter a name!", "ERROR");
+                }
+            }
+            else
+            {
+                if ((itemName != "") && (itemShortName != ""))
+                {
+                    if (ValidationHelper.ValidateShortName(itemShortName, type))
+                    {
+                        valid = true;
+                        switch (type)
+                        {
+                            case "ResourceEnvironment":
+                                serviceResponse = await ResourceEnvironmentService.GetItem(id);
+                                ResourceEnvironment resourceEnvironment = (ResourceEnvironment)serviceResponse.ResponseObject;
+                                resourceEnvironment.Name = itemName;
+                                resourceEnvironment.ShortName = itemShortName;
+                                serviceResponse = await ResourceEnvironmentService.PostItem(resourceEnvironment);
+                                break;
+                            case "ResourceLocation":
+                                serviceResponse = await ResourceLocationService.GetItem(id);
+                                ResourceLocation resourceLocation = (ResourceLocation)serviceResponse.ResponseObject;
+                                resourceLocation.ShortName = itemShortName;
+                                serviceResponse = await ResourceLocationService.PostItem(resourceLocation);
+                                break;
+                            case "ResourceOrg":
+                                serviceResponse = await ResourceOrgService.GetItem(id);
+                                ResourceOrg resourceOrg = (ResourceOrg)serviceResponse.ResponseObject;
+                                resourceOrg.Name = itemName;
+                                resourceOrg.ShortName = itemShortName;
+                                serviceResponse = await ResourceOrgService.PostItem(resourceOrg);
+                                break;
+                            case "ResourceProjAppSvc":
+                                serviceResponse = await ResourceProjAppSvcService.GetItem(id);
+                                ResourceProjAppSvc resourceProjAppSvc = (ResourceProjAppSvc)serviceResponse.ResponseObject;
+                                resourceProjAppSvc.Name = itemName;
+                                resourceProjAppSvc.ShortName = itemShortName;
+                                serviceResponse = await ResourceProjAppSvcService.PostItem(resourceProjAppSvc);
+                                break;
+                            case "ResourceType":
+                                serviceResponse = await ResourceTypeService.GetItem(id);
+                                ResourceType resourceType = (ResourceType)serviceResponse.ResponseObject;
+                                resourceType.ShortName = itemShortName;
+                                resourceType.Optional = "";
+                                resourceType.Exclude = "";
+                                if (bool.Parse(ConfigurationHelper.GetAppSetting("DevMode")))
+                                {
+                                    resourceType.Regx = itemRegEx;
+                                }
+
+                                // Update the Optional and Exclude components
+                                foreach (ResourceComponent resourceComponent in resourceComponents)
+                                {
+                                    if (resourceComponent.Name != "ResourceType")
+                                    {
+                                        // Optional
+                                        ischecked = false;
+                                        ischecked = await JsRuntime.InvokeAsync<bool>("IsElementChecked", "optional-" + GeneralHelper.NormalizeName(resourceComponent.Name, true));
+                                        if (ischecked)
+                                        {
+                                            List<string> currentoptional = new List<string>(resourceType.Optional.Split(','));
+                                            if (!currentoptional.Contains(resourceComponent.Name))
+                                            {
+                                                currentoptional.Add(GeneralHelper.NormalizeName(resourceComponent.Name, true));
+                                                resourceType.Optional = String.Join(",", currentoptional.ToArray());
+                                            }
+                                        }
+                                    }
+
+                                    // Exclude
+                                    ischecked = false;
+                                    ischecked = await JsRuntime.InvokeAsync<bool>("IsElementChecked", "exclude-" + GeneralHelper.NormalizeName(resourceComponent.Name, true));
+                                    if (ischecked)
+                                    {
+                                        List<string> currentexclude = new List<string>(resourceType.Exclude.Split(','));
+                                        if (!currentexclude.Contains(resourceComponent.Name))
+                                        {
+                                            currentexclude.Add(GeneralHelper.NormalizeName(resourceComponent.Name, true));
+                                            resourceType.Exclude = String.Join(",", currentexclude.ToArray());
+                                        }
+                                    }
+                                }
+                                serviceResponse = await ResourceTypeService.PostItem(resourceType);
+                                break;
+                            case "ResourceUnitDept":
+                                serviceResponse = await ResourceUnitDeptService.GetItem(id);
+                                ResourceUnitDept resourceUnitDept = (ResourceUnitDept)serviceResponse.ResponseObject;
+                                resourceUnitDept.Name = itemName;
+                                resourceUnitDept.ShortName = itemShortName;
+                                serviceResponse = await ResourceUnitDeptService.PostItem(resourceUnitDept);
+                                break;
+                            case "ResourceFunction":
+                                serviceResponse = await ResourceFunctionService.GetItem(id);
+                                ResourceFunction resourceFunction = (ResourceFunction)serviceResponse.ResponseObject;
+                                resourceFunction.Name = itemName;
+                                resourceFunction.ShortName = itemShortName;
+                                serviceResponse = await ResourceFunctionService.PostItem(resourceFunction);
+                                break;
+                            case "CustomComponent":
+                                serviceResponse = await CustomComponentService.GetItem(id);
+                                CustomComponent customComponent = (CustomComponent)serviceResponse.ResponseObject;
+                                customComponent.Name = itemName;
+                                customComponent.ShortName = itemShortName;
+                                serviceResponse = await CustomComponentService.PostItem(customComponent);
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        toastService.ShowError("You must enter a valid short name!", "ERROR");
+                    }
+                }
+                else
+                {
+                    toastService.ShowError("You must enter a name and short name!", "ERROR");
+                }
+            }
+
+            if (valid)
+            {
+                if (serviceResponse.Success)
+                {
+                    ModalInstance.CloseAsync();
+                    toastService.ShowSuccess(GeneralHelper.NormalizeName(type, false) + " updated!", "SUCCESS");
+                    AdminLogService.PostItem(new AdminLogMessage() { Title = "SUCCESS", Message = GeneralHelper.NormalizeName(type, false) + " updated!" });
+                }
+                else
+                {
+                    toastService.ShowError("There was an error updating the " + GeneralHelper.NormalizeName(type, false) + "! " + serviceResponse.ResponseObject, "ERROR");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AdminLogService.PostItem(new AdminLogMessage() { Title = "ERROR", Message = ex.Message });
+            toastService.ShowError("There was an error updating the " + GeneralHelper.NormalizeName(type, false) + "! " + ex.Message, "ERROR");
+        }
+    }
+
+    private async Task FormAction(string type, string action)
+    {
+        bool confirm = false;
+        confirm = await JsRuntime.InvokeAsync<bool>("confirm", "This will update all resource types! Are you sure?");
+        if (confirm)
+        {
+
+            responseMessage = new ResponseMessage();
+            var workingmodaloptions = new ModalOptions()
+                {
+                    HideCloseButton = true,
+                    UseCustomLayout = true
+                };
+
+            var workingmodal = Modal.Show<WorkingModal>("Working", workingmodaloptions);
+
+            try
+            {
+                ServiceResponse serviceResponse;
+                switch (type)
+                {
+                    case "ResourceComponent":
+                        serviceResponse = await ResourceComponentService.GetItem(id);
+                        ResourceComponent resourceComponent = (ResourceComponent)serviceResponse.ResponseObject;
+                        int componentid = (int)resourceComponent.Id;
+                        serviceResponse = await ResourceTypeService.GetItems();
+                        List<ResourceType> resourceTypes = (List<ResourceType>)serviceResponse.ResponseObject;
+                        responseMessage.Message = resourceComponent.Name;
+                        List<string> currentvalues = new();
+                        switch (action)
+                        {
+                            case "optional-add":
+                                serviceResponse = await ResourceTypeService.UpdateTypeComponents("optional-add", componentid);
+                                if (serviceResponse.Success)
+                                {
+                                    responseMessage.Message += " ADDED as OPTIONAL!";
+                                }                                
+                                break;
+                            case "optional-remove":
+                                serviceResponse = await ResourceTypeService.UpdateTypeComponents("optional-remove", componentid);
+                                if (serviceResponse.Success)
+                                {
+                                    responseMessage.Message += " REMOVED from OPTIONAL!";
+                                }
+                                break;
+                            case "exclude-add":
+                                serviceResponse = await ResourceTypeService.UpdateTypeComponents("exclude-add", componentid);
+                                if (serviceResponse.Success)
+                                {
+                                    responseMessage.Message += " ADDED as EXCLUDE!";
+                                }
+                                break;
+                            case "exclude-remove":
+                                serviceResponse = await ResourceTypeService.UpdateTypeComponents("exclude-remove", componentid);
+                                if (serviceResponse.Success)
+                                {
+                                    responseMessage.Message += " REMOVED from EXCLUDE!";
+                                }
+                                break;
+                        }
+                        break;
+                }
+
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                AdminLogService.PostItem(new AdminLogMessage() { Title = "ERROR", Message = ex.Message });
+                responseMessage.Type = MessageTypesEnum.ERROR;
+                responseMessage.Message = "There was a problem with the request.";
+            }
+
+            workingmodal.Close();
+
+            if (responseMessage.Message != null)
+            {
+                responseMessage.Message = "(" + type + ") " + responseMessage.Message;
+                switch (responseMessage.Type)
+                {
+                    case MessageTypesEnum.INFORMATION:
+                        toastService.ShowInfo(responseMessage.Message, "INFORMATION");
+                        break;
+                    case MessageTypesEnum.SUCCESS:
+                        toastService.ShowSuccess(responseMessage.Message, "SUCCESS");
+                        break;
+                    case MessageTypesEnum.WARNING:
+                        toastService.ShowWarning(responseMessage.Message, "WARNING");
+                        break;
+                    case MessageTypesEnum.ERROR:
+                        toastService.ShowError(responseMessage.Message, "ERROR");
+                        break;
+                }
+                AdminLogService.PostItem(new AdminLogMessage() { Title = responseMessage.Type.ToString(), Message = responseMessage.Message });
+            }
+        }
+    }
+
+    async Task Cancel() => await ModalInstance.CancelAsync();
+}
